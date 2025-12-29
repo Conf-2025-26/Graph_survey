@@ -1,0 +1,38 @@
+<html>
+<head>
+    <title>POUR Graph Comparison</title>
+</head>
+<body>
+
+<h1>Which Interactive POUR Graph Do You Prefer?</h1>
+
+<div style="display:flex; gap:20px;">
+
+    <!-- Graph A -->
+    <div>
+        <h2>Graph A</h2>
+        <iframe src="/static/graphA.html"
+                style="width:600px; height:600px; border:1px solid #ccc;">
+        </iframe>
+
+        <form method="POST">
+            <button name="choice" value="A">Choose Graph A</button>
+        </form>
+    </div>
+
+    <!-- Graph B -->
+    <div>
+        <h2>Graph B</h2>
+        <iframe src="/static/graphB.html"
+                style="width:600px; height:600px; border:1px solid #ccc;">
+        </iframe>
+
+        <form method="POST">
+            <button name="choice" value="B">Choose Graph B</button>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>
