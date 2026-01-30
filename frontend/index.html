@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Accessibility Visualization Survey</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
- 
+    <!-- Tab Icon (Favicon) -->
     <link rel="icon" href="./icon.png">
     <style>
         * {
@@ -291,6 +291,11 @@
             background-color: #2980b9;
         }
         
+        .submit-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
         .footer {
             text-align: center;
             margin-top: 40px;
@@ -315,6 +320,47 @@
             background-color: #3498db;
             width: 0%;
             transition: width 0.5s ease;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 9999;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            display: none;
+        }
+        
+        .success {
+            background-color: #27ae60;
+        }
+        
+        .error {
+            background-color: #e74c3c;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
         }
         
         @media (max-width: 768px) {
@@ -367,6 +413,12 @@
                 right: 20px;
                 font-size: 35px;
             }
+            
+            .notification {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+            }
         }
         
         @media (max-width: 480px) {
@@ -407,6 +459,9 @@
     </style>
 </head>
 <body>
+    <!-- Notification area -->
+    <div id="notification" class="notification"></div>
+    
     <div class="container">
         <header>
             <h1>Accessibility Visualization Survey</h1>
@@ -430,7 +485,7 @@
             <div class="image-box">
                 <div class="image-title">LLM-Generated Graph</div>
                 <div class="image-content">
-                    <img src="./gpt1.png" 
+                    <img src="./2.png" 
                          alt="LLM-Generated Graph - AI-generated visualization of accessibility issues"
                          onclick="openModal(this, 'LLM-Generated Graph')">
                 </div>
@@ -650,7 +705,7 @@
             </div>
             
             <div class="buttons">
-                <button type="submit" class="submit-btn">Submit Survey</button>
+                <button type="submit" class="submit-btn" id="submit-btn">Submit Survey</button>
             </div>
         </form>
         
@@ -692,7 +747,7 @@
             });
             
             // Form submission
-            document.getElementById('survey-form').addEventListener('submit', function(e) {
+            document.getElementById('survey-form').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 // Check required fields
@@ -734,17 +789,60 @@
                 }
                 
                 if (!isValid) {
-                    alert(`Please answer the following required questions:\n\n${missingFields.join('\n')}`);
+                    showNotification('Please answer all required questions', 'error');
                     return;
                 }
                 
-                // In a real application, you would send the data to a server here
-                alert('Thank you for completing the survey! Your responses have been recorded.');
-                this.reset();
-                q1Options.forEach(opt => opt.classList.remove('selected'));
-                q1HiddenInput.value = '';
-                textboxContainer.classList.remove('show');
-                updateProgress();
+                // Collect form data
+                const formData = {
+                    q1: q1HiddenInput.value,
+                    q2: Array.from(q2Checkboxes).map(cb => cb.value),
+                    portal_rating: document.querySelector('input[name="portal-rating"]:checked')?.value || '',
+                    llm_rating: document.querySelector('input[name="llm-rating"]:checked')?.value || '',
+                    q4: q4Selected.value,
+                    q5: q5Selected.value,
+                    has_improvements: document.getElementById('q6-yes').checked,
+                    improvements: document.getElementById('improvements').value || ''
+                };
+                
+                // Show loading state
+                const submitBtn = document.getElementById('submit-btn');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Submitting...';
+                submitBtn.disabled = true;
+                
+                try {
+                    // Send to backend
+                    const response = await fetch('/api/submit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.status === 'success') {
+                        showNotification('Thank you! Your survey has been submitted successfully.', 'success');
+                        
+                        // Reset form
+                        this.reset();
+                        q1Options.forEach(opt => opt.classList.remove('selected'));
+                        q1HiddenInput.value = '';
+                        textboxContainer.classList.remove('show');
+                        updateProgress();
+                    } else {
+                        throw new Error(data.message || 'Submission failed');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Error submitting survey. Please try again.', 'error');
+                } finally {
+                    // Restore button state
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
             });
             
             // Update progress bar as user fills the survey
@@ -755,7 +853,7 @@
                 // Check Q1
                 if (q1HiddenInput.value) answered++;
                 
-                // Check Q2
+                // Check Q2 (at least one checkbox)
                 const q2Checkboxes = document.querySelectorAll('input[name="q2"]:checked');
                 if (q2Checkboxes.length > 0) answered++;
                 
@@ -792,6 +890,19 @@
             updateProgress();
         });
         
+        // Notification function
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
         // Image modal functionality
         function openModal(imgElement, title) {
             const modal = document.getElementById('imageModal');
@@ -820,6 +931,16 @@
         function closeModal() {
             document.getElementById('imageModal').style.display = "none";
         }
+        
+        // Fallback for missing images
+        document.addEventListener('DOMContentLoaded', function() {
+            const images = document.querySelectorAll('.image-content img');
+            images.forEach(img => {
+                img.addEventListener('error', function() {
+                    this.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250"><rect width="400" height="250" fill="%23f8f9fa"/><text x="200" y="125" text-anchor="middle" font-family="Arial" font-size="16" fill="%236c757d">Image not found</text></svg>';
+                });
+            });
+        });
     </script>
 </body>
 </html>
